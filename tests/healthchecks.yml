@@ -6,6 +6,14 @@
     snapraid_manager_healthchecks_enabled: true
     snapraid_manager_healthchecks_ping_url: https://healthchecks.invalid/test-check-identifier
   tasks:
+    - name: Prepare the daemon helper directory for this task-level test
+      ansible.builtin.file:
+        path: /usr/local/libexec
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
     - name: Apply real Healthchecks credential tasks
       ansible.builtin.include_role:
         name: ansible-role-snapraid-manager

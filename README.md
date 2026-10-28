@@ -5,6 +5,7 @@ integration.
 
 ## Dependencies
 
+- Target platforms: Debian 12/13 and Ubuntu 24.04/26.04, amd64.
 - ansible-core 2.19 or newer
 - Systemd is required only when daemon integration is enabled.
 - Existing storage mounts and directories. The role never formats, mounts, or creates storage disks.
@@ -119,6 +120,12 @@ Other notification providers remain independent.
 - Automatic downgrades are not supported.
 - Configuration is fully Ansible-owned, including `/etc/snapraidd.conf` (`root:root`,`0600`). 
 - Use `0`/`1`, not YAML booleans for numeric daemon switches.
+
+## Releases
+
+Push a stable semantic-version tag such as `v1.0.0` to create a GitHub Release.
+The release job runs only after lint/unit tests and every platform integration
+job pass, and generates release notes from merged pull requests.
 
 ## License
 
