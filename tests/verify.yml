@@ -121,13 +121,15 @@
         snapraid_manager_allow_daemon_restart: true
 
     - name: Inspect disabled service
-      ansible.builtin.service_facts:
+      ansible.builtin.systemd_service:
+        name: snapraidd.service
+      register: snapraid_manager_test_disabled
 
     - name: Verify daemon was stopped and disabled
       ansible.builtin.assert:
         that:
-          - ansible_facts.services['snapraidd.service'].state == 'stopped'
-          - ansible_facts.services['snapraidd.service'].status == 'disabled'
+          - snapraid_manager_test_disabled.status.ActiveState == 'inactive'
+          - snapraid_manager_test_disabled.status.UnitFileState == 'disabled'
 
     - name: Verify daemon configuration is preserved
       ansible.builtin.stat:
