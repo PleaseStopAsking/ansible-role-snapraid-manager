@@ -30,9 +30,13 @@ snapraid_manager_daemon_defaults:
   notify_syslog_enabled: 1
   notify_syslog_level: info
   notify_heartbeat: "{{ '/usr/bin/curl --disable --config /etc/snapraid-manager/healthchecks.curl' if snapraid_manager_healthchecks_enabled else '' }}"
-  notify_start: ""
-  notify_result: ""
-  notify_result_level: warning
+  notify_start: >-
+    {{ '/usr/local/libexec/snapraid-manager-healthchecks start %h'
+       if snapraid_manager_healthchecks_enabled else '' }}
+  notify_result: >-
+    {{ '/usr/local/libexec/snapraid-manager-healthchecks result %h %l'
+       if snapraid_manager_healthchecks_enabled else '' }}
+  notify_result_level: "{{ 'error' if snapraid_manager_healthchecks_enabled else 'warning' }}"
   notify_run_as_user: ""
   notify_differences: 1
 snapraid_manager_daemon_effective_options: "{{ snapraid_manager_daemon_defaults | combine(snapraid_manager_daemon_options) }}"

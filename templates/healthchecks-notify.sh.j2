@@ -1,0 +1,16 @@
+#!/bin/sh
+
+case "$1:$2" in
+    start:maintenance)
+        exec /usr/bin/curl --disable --config /etc/snapraid-manager/healthchecks-start.curl
+        ;;
+    result:maintenance)
+        case "$3" in
+            error|critical)
+                exec /usr/bin/curl --disable --config /etc/snapraid-manager/healthchecks-fail.curl
+                ;;
+        esac
+        ;;
+esac
+
+exit 0

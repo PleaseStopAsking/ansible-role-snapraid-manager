@@ -35,7 +35,13 @@
               'template': 'mount-check.sh.j2', 'mode': '0755'}]
             if snapraid_manager_daemon_enabled else [])
          + ([{'path': '/etc/snapraid-manager/healthchecks.curl',
-              'template': 'healthchecks.curl.j2', 'mode': '0600'}]
+              'template': 'healthchecks.curl.j2', 'mode': '0600'},
+             {'path': '/etc/snapraid-manager/healthchecks-start.curl',
+              'template': 'healthchecks-start.curl.j2', 'mode': '0600'},
+             {'path': '/etc/snapraid-manager/healthchecks-fail.curl',
+              'template': 'healthchecks-fail.curl.j2', 'mode': '0600'},
+             {'path': '/usr/local/libexec/snapraid-manager-healthchecks',
+              'template': 'healthchecks-notify.sh.j2', 'mode': '0755'}]
             if snapraid_manager_daemon_enabled and snapraid_manager_healthchecks_enabled else []) }}
 
 - name: Inspect managed files without exposing configuration content

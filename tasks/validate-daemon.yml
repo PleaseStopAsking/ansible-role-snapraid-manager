@@ -54,6 +54,9 @@
   ansible.builtin.assert:
     that:
       - "'notify_heartbeat' not in snapraid_manager_daemon_options"
+      - "'notify_start' not in snapraid_manager_daemon_options"
+      - "'notify_result' not in snapraid_manager_daemon_options"
+      - "'notify_result_level' not in snapraid_manager_daemon_options"
       - snapraid_manager_daemon_effective_options.notify_run_as_user in ['', 'root']
       - snapraid_manager_healthchecks_timeout | type_debug == 'int'
       - snapraid_manager_healthchecks_timeout >= 1
@@ -62,8 +65,9 @@
       - snapraid_manager_healthchecks_retries >= 0
       - snapraid_manager_healthchecks_retries <= 5
     fail_msg: >-
-      Healthchecks owns notify_heartbeat and requires root notification access,
-      an integer timeout of 1-60 seconds, and 0-5 retries.
+      Healthchecks owns notify_heartbeat, notify_start, notify_result, and
+      notify_result_level and requires root notification access, an integer
+      timeout of 1-60 seconds, and 0-5 retries.
   when: snapraid_manager_healthchecks_enabled
 
 - name: Validate Healthchecks secret ping URL

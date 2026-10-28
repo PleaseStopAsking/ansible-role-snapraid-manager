@@ -1,0 +1,10 @@
+# {{ ansible_managed }}
+url = {{ (snapraid_manager_healthchecks_ping_url.rstrip('/') ~ '/fail') | to_json(ensure_ascii=false) }}
+proto = "=https"
+silent
+fail
+output = "/dev/null"
+connect-timeout = {{ snapraid_manager_healthchecks_timeout }}
+max-time = {{ snapraid_manager_healthchecks_timeout }}
+retry = {{ snapraid_manager_healthchecks_retries }}
+retry-max-time = 60

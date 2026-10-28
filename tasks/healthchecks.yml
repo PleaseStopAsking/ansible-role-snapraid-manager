@@ -19,8 +19,55 @@
   diff: false
   no_log: true
 
-- name: Remove disabled Healthchecks credentials
+- name: Install protected Healthchecks start curl configuration
+  ansible.builtin.template:
+    src: healthchecks-start.curl.j2
+    dest: /etc/snapraid-manager/healthchecks-start.curl
+    owner: root
+    group: root
+    mode: '0600'
+  when: snapraid_manager_healthchecks_enabled
+  diff: false
+  no_log: true
+
+- name: Install protected Healthchecks failure curl configuration
+  ansible.builtin.template:
+    src: healthchecks-fail.curl.j2
+    dest: /etc/snapraid-manager/healthchecks-fail.curl
+    owner: root
+    group: root
+    mode: '0600'
+  when: snapraid_manager_healthchecks_enabled
+  diff: false
+  no_log: true
+
+- name: Install Healthchecks start and result notifier
+  ansible.builtin.template:
+    src: healthchecks-notify.sh.j2
+    dest: /usr/local/libexec/snapraid-manager-healthchecks
+    owner: root
+    group: root
+    mode: '0755'
+  when: snapraid_manager_healthchecks_enabled
+  diff: false
+
+- name: Remove superseded Healthchecks notifier scripts
   ansible.builtin.file:
-    path: /etc/snapraid-manager/healthchecks.curl
+    path: '{{ item }}'
     state: absent
+  loop:
+    - /usr/local/libexec/snapraid-manager-healthchecks-start
+    - /usr/local/libexec/snapraid-manager-healthchecks-result
+
+- name: Remove disabled Healthchecks files
+  ansible.builtin.file:
+    path: '{{ item }}'
+    state: absent
+  loop:
+    - /etc/snapraid-manager/healthchecks.curl
+    - /etc/snapraid-manager/healthchecks-start.curl
+    - /etc/snapraid-manager/healthchecks-fail.curl
+    - /usr/local/libexec/snapraid-manager-healthchecks
+    - /usr/local/libexec/snapraid-manager-healthchecks-start
+    - /usr/local/libexec/snapraid-manager-healthchecks-result
   when: not snapraid_manager_healthchecks_enabled

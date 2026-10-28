@@ -16,10 +16,21 @@
         path: /etc/snapraid-manager/healthchecks.curl
       register: snapraid_manager_test_healthchecks_file
 
+    - name: Inspect Healthchecks endpoint and helper files
+      ansible.builtin.stat:
+        path: '{{ item }}'
+      loop:
+        - /etc/snapraid-manager/healthchecks-start.curl
+        - /etc/snapraid-manager/healthchecks-fail.curl
+        - /usr/local/libexec/snapraid-manager-healthchecks
+      register: snapraid_manager_test_healthchecks_files
+
     - name: Verify credential lifecycle matches the integration switch
       ansible.builtin.assert:
         that:
           - snapraid_manager_test_healthchecks_file.stat.exists == snapraid_manager_healthchecks_enabled
+          - item.stat.exists == snapraid_manager_healthchecks_enabled
+      loop: '{{ snapraid_manager_test_healthchecks_files.results }}'
 
     - name: Verify enabled Healthchecks configuration
       when: snapraid_manager_healthchecks_enabled
@@ -37,6 +48,15 @@
               - snapraid_manager_test_healthchecks_file.stat.gid == 0
               - snapraid_manager_test_healthchecks_directory.stat.mode == '0700'
               - snapraid_manager_test_healthchecks_directory.stat.uid == 0
+              - snapraid_manager_test_healthchecks_files.results[0].stat.mode == '0600'
+              - snapraid_manager_test_healthchecks_files.results[0].stat.uid == 0
+              - snapraid_manager_test_healthchecks_files.results[0].stat.gid == 0
+              - snapraid_manager_test_healthchecks_files.results[1].stat.mode == '0600'
+              - snapraid_manager_test_healthchecks_files.results[1].stat.uid == 0
+              - snapraid_manager_test_healthchecks_files.results[1].stat.gid == 0
+              - snapraid_manager_test_healthchecks_files.results[2].stat.mode == '0755'
+              - snapraid_manager_test_healthchecks_files.results[2].stat.uid == 0
+              - snapraid_manager_test_healthchecks_files.results[2].stat.gid == 0
 
         - name: Verify curl accepts its protected configuration without sending a ping
           ansible.builtin.command:
@@ -48,10 +68,50 @@
               - --version
           changed_when: false
 
+        - name: Verify curl accepts the protected start configuration without sending a ping
+          ansible.builtin.command:
+            argv:
+              - /usr/bin/curl
+              - --disable
+              - --config
+              - /etc/snapraid-manager/healthchecks-start.curl
+              - --version
+          changed_when: false
+
+        - name: Verify curl accepts the protected failure configuration without sending a ping
+          ansible.builtin.command:
+            argv:
+              - /usr/bin/curl
+              - --disable
+              - --config
+              - /etc/snapraid-manager/healthchecks-fail.curl
+              - --version
+          changed_when: false
+
+        - name: Verify Healthchecks notifier shell syntax
+          ansible.builtin.command:
+            argv:
+              - /bin/sh
+              - -n
+              - /usr/local/libexec/snapraid-manager-healthchecks
+          changed_when: false
+
         - name: Read protected Healthchecks test configuration
           ansible.builtin.slurp:
             src: /etc/snapraid-manager/healthchecks.curl
           register: snapraid_manager_test_healthchecks_content
+          no_log: true
+
+        - name: Read protected Healthchecks start configuration
+          ansible.builtin.slurp:
+            src: /etc/snapraid-manager/healthchecks-start.curl
+          register: snapraid_manager_test_healthchecks_start_content
+          no_log: true
+
+        - name: Read protected Healthchecks failure configuration
+          ansible.builtin.slurp:
+            src: /etc/snapraid-manager/healthchecks-fail.curl
+          register: snapraid_manager_test_healthchecks_fail_content
           no_log: true
 
         - name: Verify the configured endpoint and transfer policy
@@ -60,4 +120,8 @@
               - snapraid_manager_healthchecks_ping_url in (snapraid_manager_test_healthchecks_content.content | b64decode)
               - "'proto = \"=https\"' in (snapraid_manager_test_healthchecks_content.content | b64decode)"
               - "'retry-max-time = 60' in (snapraid_manager_test_healthchecks_content.content | b64decode)"
+              - "snapraid_manager_healthchecks_ping_url.rstrip('/') ~ '/start' in (snapraid_manager_test_healthchecks_start_content.content | b64decode)"
+              - "'retry-max-time = 60' in (snapraid_manager_test_healthchecks_start_content.content | b64decode)"
+              - "snapraid_manager_healthchecks_ping_url.rstrip('/') ~ '/fail' in (snapraid_manager_test_healthchecks_fail_content.content | b64decode)"
+              - "'retry-max-time = 60' in (snapraid_manager_test_healthchecks_fail_content.content | b64decode)"
           no_log: true

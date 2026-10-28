@@ -103,8 +103,18 @@
       ansible.builtin.assert:
         that:
           - "'notify_heartbeat = /usr/bin/curl --disable --config /etc/snapraid-manager/healthchecks.curl' in daemon_config"
+          - "'notify_start = /usr/local/libexec/snapraid-manager-healthchecks start %h' in daemon_config"
+          - "'notify_result = /usr/local/libexec/snapraid-manager-healthchecks result %h %l' in daemon_config"
+          - "'notify_result_level = error' in daemon_config"
           - snapraid_manager_healthchecks_ping_url not in daemon_config
           - "'url = \"https://hc-ping.com/test-check-identifier\"' in curl_config"
+          - "'url = \"https://hc-ping.com/test-check-identifier/start\"' in start_curl_config"
+          - "'url = \"https://hc-ping.com/test-check-identifier/fail\"' in fail_curl_config"
+          - "'/etc/snapraid-manager/healthchecks-start.curl' in notify_script"
+          - "'/etc/snapraid-manager/healthchecks-fail.curl' in notify_script"
+          - "'start:maintenance)' in notify_script"
+          - "'result:maintenance)' in notify_script"
+          - "'error|critical)' in notify_script"
           - "'max-time = 10' in curl_config"
           - "'retry = 3' in curl_config"
       vars:
@@ -112,6 +122,9 @@
         snapraid_manager_healthchecks_ping_url: https://hc-ping.com/test-check-identifier
         daemon_config: "{{ lookup('ansible.builtin.template', '../templates/snapraidd.conf.j2') }}"
         curl_config: "{{ lookup('ansible.builtin.template', '../templates/healthchecks.curl.j2') }}"
+        start_curl_config: "{{ lookup('ansible.builtin.template', '../templates/healthchecks-start.curl.j2') }}"
+        notify_script: "{{ lookup('ansible.builtin.template', '../templates/healthchecks-notify.sh.j2') }}"
+        fail_curl_config: "{{ lookup('ansible.builtin.template', '../templates/healthchecks-fail.curl.j2') }}"
 
     - name: Verify user options merge with security defaults
       ansible.builtin.assert:
@@ -177,6 +190,18 @@
           healthchecks_enabled: true
           daemon_options:
             notify_heartbeat: /usr/bin/true
+          expected: Validate Healthchecks ownership and execution settings
+        - name: Healthchecks rejects conflicting result commands
+          tasks_from: validate-daemon
+          healthchecks_enabled: true
+          daemon_options:
+            notify_result: /usr/bin/true
+          expected: Validate Healthchecks ownership and execution settings
+        - name: Healthchecks rejects conflicting result level
+          tasks_from: validate-daemon
+          healthchecks_enabled: true
+          daemon_options:
+            notify_result_level: info
           expected: Validate Healthchecks ownership and execution settings
         - name: Healthchecks rejects an unprivileged notification user
           tasks_from: validate-daemon
