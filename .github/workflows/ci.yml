@@ -13,7 +13,7 @@ jobs:
       matrix:
         ansible: ["2.19", "2.21"]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           path: ansible-role-snapraid-manager
       - uses: actions/setup-python@v7
@@ -37,7 +37,7 @@ jobs:
       matrix:
         image: ["debian:12", "debian:13", "ubuntu:24.04"]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           path: ansible-role-snapraid-manager
       - uses: actions/setup-python@v7
