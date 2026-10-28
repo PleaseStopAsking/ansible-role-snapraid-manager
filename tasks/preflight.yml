@@ -1,0 +1,114 @@
+---
+- name: Gather installed package versions
+  ansible.builtin.package_facts:
+    manager: apt
+
+- name: Gather service state
+  ansible.builtin.service_facts:
+
+- name: Check ownership of the daemon service
+  ansible.builtin.stat:
+    path: /etc/systemd/system/snapraidd.service.d/10-ansible.conf
+  register: snapraid_manager_daemon_owned
+
+- name: Determine package changes
+  ansible.builtin.set_fact:
+    snapraid_manager_cli_package_needed: >-
+      {{ snapraid_manager_install and
+         (ansible_facts.packages.get('snapraid', []) | map(attribute='version') | first | default(''))
+         != snapraid_manager_version ~ '-1' }}
+    snapraid_manager_daemon_package_needed: >-
+      {{ snapraid_manager_daemon_enabled and
+         (ansible_facts.packages.get('snapraid-daemon', []) | map(attribute='version') | first | default(''))
+         != snapraid_manager_daemon_version ~ '-1' }}
+    snapraid_manager_daemon_running: >-
+      {{ ansible_facts.services.get('snapraidd.service', {}).get('state', '') == 'running' }}
+
+- name: Define managed file expectations
+  ansible.builtin.set_fact:
+    snapraid_manager_managed_files: >-
+      {{ [{'path': snapraid_manager_config_path, 'template': 'snapraid.conf.j2', 'mode': '0644'}]
+         + ([{'path': '/etc/snapraidd.conf', 'template': 'snapraidd.conf.j2', 'mode': '0600'},
+             {'path': '/etc/systemd/system/snapraidd.service.d/10-ansible.conf',
+              'template': 'daemon-override.conf.j2', 'mode': '0644'},
+             {'path': '/usr/local/libexec/snapraid-manager-mount-check',
+              'template': 'mount-check.sh.j2', 'mode': '0755'}]
+            if snapraid_manager_daemon_enabled else []) }}
+
+- name: Inspect managed files without exposing configuration content
+  ansible.builtin.stat:
+    path: "{{ item.path }}"
+    checksum_algorithm: sha256
+  loop: "{{ snapraid_manager_managed_files }}"
+  register: snapraid_manager_file_status
+
+- name: Determine whether configuration needs to change
+  ansible.builtin.set_fact:
+    snapraid_manager_configuration_changed: false
+
+- name: Compare desired configuration with installed files
+  ansible.builtin.set_fact:
+    snapraid_manager_configuration_changed: true
+  when: >-
+    item.stat.checksum | default('') !=
+      lookup('ansible.builtin.template', item.item.template) | hash('sha256')
+    or item.stat.mode | default('') != item.item.mode
+    or item.stat.uid | default(-1) != 0
+    or item.stat.gid | default(-1) != 0
+  loop: "{{ snapraid_manager_file_status.results }}"
+  no_log: true
+
+- name: Determine whether daemon must be stopped
+  ansible.builtin.set_fact:
+    snapraid_manager_daemon_stop_needed: >-
+      {{ snapraid_manager_daemon_running and
+         (snapraid_manager_configuration_changed or snapraid_manager_cli_package_needed
+          or snapraid_manager_daemon_package_needed
+          or (snapraid_manager_daemon_owned.stat.exists and not snapraid_manager_daemon_enabled)) }}
+
+- name: Require explicit permission before interrupting a running daemon
+  ansible.builtin.assert:
+    that:
+      - not snapraid_manager_daemon_stop_needed or snapraid_manager_allow_daemon_restart
+      - not snapraid_manager_daemon_stop_needed or snapraid_manager_daemon_enabled or snapraid_manager_daemon_owned.stat.exists
+    fail_msg: >-
+      Changes would stop a running daemon and may interrupt array work. Wait for maintenance
+      to finish, then set snapraid_manager_allow_daemon_restart=true for this deployment.
+      An externally managed daemon must be stopped manually or adopted by enabling integration.
+
+- name: Check existing array directories
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop: >-
+    {{ (snapraid_manager_data_disks | map(attribute='path') | list
+        + snapraid_manager_parity_disks | map(attribute='path') | map('dirname') | list
+        + snapraid_manager_content_files | map('dirname') | list
+        + [snapraid_manager_config_path | dirname]) | unique | list }}
+  register: snapraid_manager_array_directories
+
+- name: Require existing array directories
+  ansible.builtin.assert:
+    that:
+      - item.stat.isdir | default(false)
+    fail_msg: "Required directory {{ item.item }} does not exist. This role does not create storage directories or mount disks."
+  loop: "{{ snapraid_manager_array_directories.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+
+- name: Check required mounts before enabling daemon
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/mountpoint
+      - -q
+      - --
+      - "{{ item }}"
+  loop: "{{ snapraid_manager_required_mounts }}"
+  changed_when: false
+  check_mode: false
+  when: snapraid_manager_daemon_enabled
+
+- name: Stop daemon before changing packages or configuration
+  ansible.builtin.systemd_service:
+    name: snapraidd.service
+    state: stopped
+  when: snapraid_manager_daemon_stop_needed

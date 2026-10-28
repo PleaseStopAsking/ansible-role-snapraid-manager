@@ -1,0 +1,140 @@
+---
+- name: Verify daemon behavior in disposable Linux container
+  hosts: all
+  gather_facts: true
+  vars_files:
+    - array.yml
+  vars:
+    snapraid_manager_daemon_enabled: true
+  tasks:
+    - name: Check daemon HTTP interface
+      ansible.builtin.uri:
+        url: http://127.0.0.1:7627/
+        return_content: true
+      register: snapraid_manager_test_http
+      until: snapraid_manager_test_http.status | default(0) == 200
+      retries: 5
+      delay: 2
+
+    - name: Check protected daemon configuration
+      ansible.builtin.stat:
+        path: /etc/snapraidd.conf
+      register: snapraid_manager_test_config
+
+    - name: Verify daemon configuration permissions
+      ansible.builtin.assert:
+        that:
+          - snapraid_manager_test_config.stat.mode == '0600'
+          - snapraid_manager_test_config.stat.uid == 0
+
+    - name: Check no parity or content initialization occurred
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop:
+        - /var/snapraid.content
+        - /mnt/parity1/snapraid.parity
+        - /mnt/parity2/snapraid.parity
+      register: snapraid_manager_test_array_files
+
+    - name: Verify deployment did not initialize the array
+      ansible.builtin.assert:
+        that:
+          - not item.stat.exists
+      loop: "{{ snapraid_manager_test_array_files.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+
+    - name: Verify mount guard with all mounts present
+      ansible.builtin.command: /usr/local/libexec/snapraid-manager-mount-check task-begin
+      changed_when: false
+
+    - name: Unmount disposable test disk
+      ansible.posix.mount:
+        path: /mnt/data1
+        state: unmounted
+
+    - name: Verify mount guard rejects missing test disk
+      ansible.builtin.command: /usr/local/libexec/snapraid-manager-mount-check task-begin
+      register: snapraid_manager_test_mount_guard
+      changed_when: false
+      failed_when: snapraid_manager_test_mount_guard.rc != 1
+
+    - name: Restore disposable test disk
+      ansible.posix.mount:
+        path: /mnt/data1
+        src: tmpfs
+        fstype: tmpfs
+        state: ephemeral
+
+    - name: Simulate UI configuration drift
+      ansible.builtin.lineinfile:
+        path: /etc/snapraidd.conf
+        regexp: "^scrub_percentage ="
+        line: scrub_percentage = 3
+
+    - name: Verify running daemon changes require explicit permission
+      block:
+        - name: Attempt unapproved configuration change
+          ansible.builtin.include_role:
+            name: ansible-role-snapraid-manager
+
+        - name: Record unexpected restart permission
+          ansible.builtin.set_fact:
+            snapraid_manager_test_restart_blocked: false
+      rescue:
+        - name: Verify restart guard caused the rejection
+          ansible.builtin.assert:
+            that:
+              - ansible_failed_task.name == 'Require explicit permission before interrupting a running daemon'
+
+        - name: Record expected restart guard
+          ansible.builtin.set_fact:
+            snapraid_manager_test_restart_blocked: true
+
+    - name: Require restart protection
+      ansible.builtin.assert:
+        that:
+          - snapraid_manager_test_restart_blocked
+
+    - name: Restore authoritative configuration with explicit permission
+      ansible.builtin.include_role:
+        name: ansible-role-snapraid-manager
+      vars:
+        snapraid_manager_allow_daemon_restart: true
+
+    - name: Read restored configuration
+      ansible.builtin.slurp:
+        src: /etc/snapraidd.conf
+      register: snapraid_manager_test_restored
+      no_log: true
+
+    - name: Verify Ansible restored declared scrub policy
+      ansible.builtin.assert:
+        that:
+          - "'scrub_percentage = 12' in (snapraid_manager_test_restored.content | b64decode)"
+
+    - name: Disable daemon integration
+      ansible.builtin.include_role:
+        name: ansible-role-snapraid-manager
+      vars:
+        snapraid_manager_daemon_enabled: false
+        snapraid_manager_allow_daemon_restart: true
+
+    - name: Inspect disabled service
+      ansible.builtin.service_facts:
+
+    - name: Verify daemon was stopped and disabled
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.services['snapraidd.service'].state == 'stopped'
+          - ansible_facts.services['snapraidd.service'].status == 'disabled'
+
+    - name: Verify daemon configuration is preserved
+      ansible.builtin.stat:
+        path: /etc/snapraidd.conf
+      register: snapraid_manager_test_preserved
+
+    - name: Require preserved configuration
+      ansible.builtin.assert:
+        that:
+          - snapraid_manager_test_preserved.stat.exists

@@ -1,0 +1,35 @@
+---
+- name: Install package download prerequisites
+  ansible.builtin.apt:
+    name:
+      - ca-certificates
+      - xz-utils
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Create package cache
+  ansible.builtin.file:
+    path: "{{ snapraid_manager_cache_directory }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Download verified SnapRAID package
+  ansible.builtin.get_url:
+    url: "{{ snapraid_manager_package_url }}"
+    dest: "{{ snapraid_manager_cache_directory }}/snapraid-{{ snapraid_manager_version }}.deb"
+    checksum: "{{ snapraid_manager_package_checksum }}"
+    owner: root
+    group: root
+    mode: "0644"
+  when: snapraid_manager_cli_package_needed
+
+- name: Install pinned SnapRAID package
+  ansible.builtin.apt:
+    deb: "{{ snapraid_manager_cache_directory }}/snapraid-{{ snapraid_manager_version }}.deb"
+    allow_downgrade: false
+  when:
+    - snapraid_manager_cli_package_needed
+    - not ansible_check_mode

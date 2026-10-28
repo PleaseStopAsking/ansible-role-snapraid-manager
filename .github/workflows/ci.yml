@@ -1,0 +1,53 @@
+---
+name: CI
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  lint-and-unit:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        ansible: ["2.19", "2.21"]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: ansible-role-snapraid-manager
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install test dependencies
+        run: pip install 'ansible-core~=${{ matrix.ansible }}.0' ansible-lint
+      - name: Install test collections
+        working-directory: ansible-role-snapraid-manager
+        run: ansible-galaxy collection install -r tests/requirements.yml -p .ansible/collections
+      - name: Lint
+        working-directory: ansible-role-snapraid-manager
+        run: ansible-lint --offline
+      - name: Run host-safe behavior tests
+        working-directory: ansible-role-snapraid-manager
+        run: ansible-playbook -i localhost, tests/core.yml
+  integration:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ["debian:12", "debian:13", "ubuntu:24.04"]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: ansible-role-snapraid-manager
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install Ansible
+        run: pip install 'ansible-core>=2.19,<2.22'
+      - name: Install Docker connection plugin
+        working-directory: ansible-role-snapraid-manager
+        run: ansible-galaxy collection install -r tests/requirements.yml -p .ansible/collections
+      - name: Run integration and idempotence tests
+        working-directory: ansible-role-snapraid-manager
+        run: bash tests/integration.sh '${{ matrix.image }}'

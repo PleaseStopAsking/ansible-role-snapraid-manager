@@ -1,0 +1,89 @@
+---
+- name: Install daemon runtime prerequisites
+  ansible.builtin.apt:
+    name:
+      - ca-certificates
+      - curl
+      - util-linux
+      - zlib1g
+      - libzstd1
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Create daemon support directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - "{{ snapraid_manager_cache_directory }}"
+    - /usr/local/libexec
+    - /etc/systemd/system/snapraidd.service.d
+    - "{{ snapraid_manager_daemon_effective_options.sys_log_directory }}"
+
+- name: Install runtime mount guard
+  ansible.builtin.template:
+    src: mount-check.sh.j2
+    dest: /usr/local/libexec/snapraid-manager-mount-check
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Configure daemon with full Ansible ownership
+  ansible.builtin.template:
+    src: snapraidd.conf.j2
+    dest: /etc/snapraidd.conf
+    owner: root
+    group: root
+    mode: "0600"
+  diff: false
+  no_log: true
+
+- name: Install daemon service override
+  ansible.builtin.template:
+    src: daemon-override.conf.j2
+    dest: /etc/systemd/system/snapraidd.service.d/10-ansible.conf
+    owner: root
+    group: root
+    mode: "0644"
+  register: snapraid_manager_daemon_override
+
+- name: Download verified daemon package
+  ansible.builtin.get_url:
+    url: "{{ snapraid_manager_daemon_package_url }}"
+    dest: "{{ snapraid_manager_cache_directory }}/snapraid-daemon-{{ snapraid_manager_daemon_version }}.deb"
+    checksum: "{{ snapraid_manager_daemon_package_checksum }}"
+    owner: root
+    group: root
+    mode: "0644"
+  when: snapraid_manager_daemon_package_needed
+
+- name: Prevent package scripts from starting daemon prematurely
+  ansible.builtin.systemd_service:
+    name: snapraidd.service
+    masked: true
+    daemon_reload: true
+  when:
+    - snapraid_manager_daemon_package_needed
+    - not ansible_check_mode
+
+- name: Install pinned daemon package
+  ansible.builtin.apt:
+    deb: "{{ snapraid_manager_cache_directory }}/snapraid-daemon-{{ snapraid_manager_daemon_version }}.deb"
+    dpkg_options: force-confdef,force-confold
+    allow_downgrade: false
+  when:
+    - snapraid_manager_daemon_package_needed
+    - not ansible_check_mode
+
+- name: Enable and start configured daemon
+  ansible.builtin.systemd_service:
+    name: snapraidd.service
+    masked: false
+    enabled: true
+    state: started
+    daemon_reload: "{{ snapraid_manager_daemon_override.changed or snapraid_manager_daemon_package_needed }}"
+  when: not ansible_check_mode

@@ -1,0 +1,32 @@
+---
+- name: Exercise invalid configuration
+  block:
+    - name: Run validation on invalid input
+      ansible.builtin.include_role:
+        name: ansible-role-snapraid-manager
+        tasks_from: validate
+      vars:
+        ansible_facts:
+          distribution: "{{ snapraid_manager_test_case.distribution | default('Debian') }}"
+          architecture: x86_64
+        snapraid_manager_data_disks: "{{ snapraid_manager_test_case.data | default([{'name': 'd1', 'path': '/mnt/data1'}]) }}"
+        snapraid_manager_parity_disks: "{{ snapraid_manager_test_case.parity | default([{'level': 1, 'path': '/mnt/parity1/snapraid.parity'}]) }}"
+        snapraid_manager_excludes: "{{ snapraid_manager_test_case.excludes | default([]) }}"
+
+    - name: Record unexpected validation success
+      ansible.builtin.set_fact:
+        snapraid_manager_test_rejection: false
+  rescue:
+    - name: Verify the expected validation caught the input
+      ansible.builtin.assert:
+        that:
+          - ansible_failed_task.name == snapraid_manager_test_case.expected
+
+    - name: Record expected rejection
+      ansible.builtin.set_fact:
+        snapraid_manager_test_rejection: true
+
+- name: Require rejection of invalid input
+  ansible.builtin.assert:
+    that:
+      - snapraid_manager_test_rejection

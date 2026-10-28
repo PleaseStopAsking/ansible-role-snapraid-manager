@@ -1,0 +1,15 @@
+---
+snapraid_manager_data_disks:
+  - name: d1
+    path: /mnt/data1
+  - name: d2
+    path: /mnt/data2
+snapraid_manager_parity_disks:
+  - level: 1
+    path: /mnt/parity1/snapraid.parity
+  - level: 2
+    path: /mnt/parity2/snapraid.parity
+snapraid_manager_content_files:
+  - /var/snapraid.content
+  - /mnt/data1/.snapraid.content
+  - /mnt/data2/.snapraid.content

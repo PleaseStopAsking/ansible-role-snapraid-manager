@@ -1,0 +1,22 @@
+---
+galaxy_info:
+  namespace: pleasestopasking
+  role_name: snapraid_manager
+  author: PleaseStopAsking
+  description: Manage SnapRAID and optional SnapRAID Daemon on Debian and Ubuntu amd64
+  license: MIT
+  min_ansible_version: "2.19"
+  platforms:
+    - name: Debian
+      versions:
+        - bookworm
+        - trixie
+    - name: Ubuntu
+      versions:
+        - noble
+  galaxy_tags:
+    - storage
+    - snapraid
+    - backup
+    - system
+dependencies: []

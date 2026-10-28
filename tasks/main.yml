@@ -1,0 +1,54 @@
+---
+- name: Validate SnapRAID configuration
+  ansible.builtin.import_tasks: validate.yml
+
+- name: Validate daemon configuration
+  ansible.builtin.include_tasks: validate-daemon.yml
+  when: snapraid_manager_daemon_enabled
+
+- name: Check existing installation before making changes
+  ansible.builtin.import_tasks: preflight.yml
+
+- name: Install SnapRAID
+  ansible.builtin.include_tasks: install.yml
+  when: snapraid_manager_install
+
+- name: Verify the configured SnapRAID executable
+  ansible.builtin.command:
+    argv:
+      - "{{ snapraid_manager_binary }}"
+      - --version
+  register: snapraid_manager_binary_version
+  changed_when: false
+  when: not ansible_check_mode
+
+- name: Verify daemon-compatible SnapRAID version
+  ansible.builtin.assert:
+    that:
+      - snapraid_manager_binary_version.stdout is search('(?i)^snapraid( cli)? v[0-9]+\.[0-9]+')
+      - (snapraid_manager_binary_version.stdout | regex_search('[0-9]+\.[0-9]+')) is version('15.1', '>=')
+    fail_msg: SnapRAID Daemon integration requires a SnapRAID CLI version of at least 15.1.
+  when:
+    - snapraid_manager_daemon_enabled
+    - not ansible_check_mode
+
+- name: Configure SnapRAID
+  ansible.builtin.template:
+    src: snapraid.conf.j2
+    dest: "{{ snapraid_manager_config_path }}"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Install and configure optional daemon
+  ansible.builtin.include_tasks: daemon.yml
+  when: snapraid_manager_daemon_enabled
+
+- name: Disable a daemon previously managed by this role
+  ansible.builtin.systemd_service:
+    name: snapraidd.service
+    state: stopped
+    enabled: false
+  when:
+    - not snapraid_manager_daemon_enabled
+    - snapraid_manager_daemon_owned.stat.exists

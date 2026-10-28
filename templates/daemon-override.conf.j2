@@ -1,0 +1,8 @@
+# {{ ansible_managed }}
+[Unit]
+RequiresMountsFor={% for mount in snapraid_manager_required_mounts %} {{ mount | replace('%', '%%') | to_json }}{% endfor %}
+
+[Service]
+ExecStart=
+ExecStart=/usr/bin/snapraidd -c /etc/snapraidd.conf -C {{ snapraid_manager_config_path | replace('%', '%%') | to_json }}
+UMask=0077

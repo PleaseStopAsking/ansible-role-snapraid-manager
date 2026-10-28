@@ -1,0 +1,29 @@
+---
+snapraid_manager_install: true
+snapraid_manager_version: "15.1"
+snapraid_manager_package_url: >-
+  https://github.com/amadvance/snapraid/releases/download/v{{ snapraid_manager_version
+  }}/snapraid_{{ snapraid_manager_version }}-1_amd64.deb
+snapraid_manager_package_checksum: "sha256:974cd45fc8f44d5642b49bd9b30e81aca2bcd7689877f9fa73d1e58d3f1b5bda"
+snapraid_manager_binary: /usr/bin/snapraid
+snapraid_manager_config_path: /etc/snapraid.conf
+snapraid_manager_cache_directory: /var/cache/snapraid-manager
+
+snapraid_manager_data_disks: []
+snapraid_manager_parity_disks: []
+snapraid_manager_content_files: []
+snapraid_manager_excludes: []
+snapraid_manager_exclude_hidden: false
+
+snapraid_manager_daemon_enabled: false
+snapraid_manager_allow_daemon_restart: false
+snapraid_manager_daemon_version: "2.1"
+snapraid_manager_daemon_package_url: >-
+  https://github.com/amadvance/snapraid-daemon/releases/download/v{{ snapraid_manager_daemon_version
+  }}/snapraid-daemon_{{ snapraid_manager_daemon_version }}-1_amd64.deb
+snapraid_manager_daemon_package_checksum: "sha256:7f8ddbf41f6bb425371095f4b156f53c293609d2d64a9a012c319b20f1313e5d"
+snapraid_manager_daemon_options: {}
+snapraid_manager_daemon_hook: ""
+snapraid_manager_required_mounts: >-
+  {{ (snapraid_manager_data_disks | map(attribute='path') | list
+      + snapraid_manager_parity_disks | map(attribute='path') | map('dirname') | list) | unique | list }}

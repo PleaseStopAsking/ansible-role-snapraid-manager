@@ -1,0 +1,54 @@
+---
+snapraid_manager_daemon_defaults:
+  sys_engine: "{{ snapraid_manager_binary }}"
+  sys_log_directory: /var/log/snapraid
+  sys_log_retention_days: 120
+  sys_log_compression: 0
+  sys_shutdown_on: ""
+  net_enabled: 1
+  net_port: "127.0.0.1:7627"
+  net_acl: "+127.0.0.1"
+  net_security_headers: 1
+  net_allowed_origin: self
+  net_config_full_access: 0
+  net_web_root: commander.zip
+  net_auth_credential: ""
+  check_updates: 0
+  maintenance_schedule: ""
+  sync_threshold_deletes: 50
+  sync_threshold_updates: 100
+  sync_prehash: 0
+  sync_prevent_truncations: 1
+  scrub_percentage: 12
+  scrub_older_than: 10
+  touch_zero_subseconds: 0
+  probe_interval_minutes: 3
+  spindown_idle_minutes: 0
+  hook_script: /usr/local/libexec/snapraid-manager-mount-check
+  hook_docker_pause: ""
+  hook_run_as_user: ""
+  notify_syslog_enabled: 1
+  notify_syslog_level: info
+  notify_heartbeat: ""
+  notify_start: ""
+  notify_result: ""
+  notify_result_level: warning
+  notify_run_as_user: ""
+  notify_differences: 1
+snapraid_manager_daemon_effective_options: "{{ snapraid_manager_daemon_defaults | combine(snapraid_manager_daemon_options) }}"
+snapraid_manager_daemon_integer_ranges:
+  sys_log_retention_days: [0, 10000]
+  sys_log_compression: [0, 1]
+  net_enabled: [0, 1]
+  net_security_headers: [0, 1]
+  net_config_full_access: [0, 1]
+  check_updates: [0, 1]
+  sync_threshold_deletes: [0, 10000]
+  sync_threshold_updates: [0, 10000]
+  sync_prehash: [0, 1]
+  sync_prevent_truncations: [0, 1]
+  scrub_older_than: [0, 1000]
+  touch_zero_subseconds: [0, 1]
+  probe_interval_minutes: [0, 1440]
+  notify_syslog_enabled: [0, 1]
+  notify_differences: [0, 1]

@@ -1,0 +1,16 @@
+#!/bin/sh
+# {{ ansible_managed }}
+set -eu
+if [ "${1:-}" = task-begin ]; then
+{% for mount in snapraid_manager_required_mounts %}
+    if ! /usr/bin/mountpoint -q -- {{ mount | quote }}; then
+        printf '%s\n' {{ ('Required SnapRAID mount is unavailable: ' ~ mount) | quote }} >&2
+        exit 1
+    fi
+{% endfor %}
+fi
+{% if snapraid_manager_daemon_hook %}
+exec {{ snapraid_manager_daemon_hook | quote }} "$@"
+{% else %}
+exit 0
+{% endif %}

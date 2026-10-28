@@ -1,0 +1,86 @@
+---
+- name: Validate supported host
+  ansible.builtin.assert:
+    that:
+      - ansible_facts['distribution'] in ['Debian', 'Ubuntu']
+      - ansible_facts['architecture'] == 'x86_64'
+    fail_msg: This role supports Debian and Ubuntu on amd64 only.
+
+- name: Validate role switches and configuration paths
+  ansible.builtin.assert:
+    that:
+      - snapraid_manager_install is boolean
+      - snapraid_manager_daemon_enabled is boolean
+      - snapraid_manager_allow_daemon_restart is boolean
+      - snapraid_manager_exclude_hidden is boolean
+      - snapraid_manager_version is match('^[0-9]+\.[0-9]+(\.[0-9]+)?$')
+      - snapraid_manager_config_path is match('^/[^\r\n]+$')
+      - snapraid_manager_binary is match('^/[^\r\n]+$')
+      - snapraid_manager_cache_directory is match('^/[^\r\n]+$')
+      - snapraid_manager_package_checksum is match('^sha256:[a-f0-9]{64}$')
+
+- name: Validate array collections
+  ansible.builtin.assert:
+    that:
+      - snapraid_manager_data_disks | type_debug == 'list'
+      - snapraid_manager_parity_disks | type_debug == 'list'
+      - snapraid_manager_content_files | type_debug == 'list'
+      - snapraid_manager_excludes | type_debug == 'list'
+      - snapraid_manager_data_disks | length > 0
+      - snapraid_manager_parity_disks | length > 0
+      - snapraid_manager_parity_disks | length <= 6
+      - snapraid_manager_content_files | length > 0
+    fail_msg: Define data disks, parity disks and explicit content-file paths.
+
+- name: Validate data disks
+  ansible.builtin.assert:
+    that:
+      - item is mapping
+      - item.name is defined
+      - item.path is defined
+      - item.name is match('^[A-Za-z0-9_][A-Za-z0-9_-]*$')
+      - item.path is match('^/[^\r\n]+$')
+  loop: "{{ snapraid_manager_data_disks }}"
+  loop_control:
+    label: "{{ item.name | default('invalid disk') }}"
+
+- name: Validate parity disks
+  ansible.builtin.assert:
+    that:
+      - item is mapping
+      - item.level is defined
+      - item.path is defined
+      - item.level | type_debug == 'int'
+      - item.level >= 1
+      - item.level <= 6
+      - item.path is match('^/[^\r\n]+$')
+  loop: "{{ snapraid_manager_parity_disks }}"
+  loop_control:
+    label: "{{ item.level | default('invalid parity') }}"
+
+- name: Validate stable and unique array identities
+  ansible.builtin.assert:
+    that:
+      - snapraid_manager_data_disks | map(attribute='name') | unique | length == snapraid_manager_data_disks | length
+      - snapraid_manager_data_disks | map(attribute='path') | unique | length == snapraid_manager_data_disks | length
+      - snapraid_manager_parity_disks | map(attribute='level') | unique | length == snapraid_manager_parity_disks | length
+      - snapraid_manager_parity_disks | map(attribute='path') | unique | length == snapraid_manager_parity_disks | length
+      - snapraid_manager_parity_disks | map(attribute='level') | sort == range(1, (snapraid_manager_parity_disks | length) + 1) | list
+      - snapraid_manager_content_files | unique | length == snapraid_manager_content_files | length
+      - snapraid_manager_content_files | intersect(snapraid_manager_parity_disks | map(attribute='path') | list) | length == 0
+
+- name: Validate content-file paths
+  ansible.builtin.assert:
+    that:
+      - item is string
+      - item is match('^/[^\r\n]+$')
+  loop: "{{ snapraid_manager_content_files }}"
+
+- name: Validate exclusion patterns
+  ansible.builtin.assert:
+    that:
+      - item is string
+      - item | length > 0
+      - "'\n' not in item"
+      - "'\r' not in item"
+  loop: "{{ snapraid_manager_excludes }}"

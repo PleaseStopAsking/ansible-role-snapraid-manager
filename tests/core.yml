@@ -1,0 +1,136 @@
+---
+- name: Test core validation and rendering without modifying the host
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    ansible_facts:
+      distribution: Debian
+      architecture: x86_64
+      service_mgr: systemd
+    ansible_managed: Ansible managed
+    snapraid_manager_data_disks:
+      - name: d1
+        path: /mnt/data1
+      - name: d2
+        path: /mnt/data2
+    snapraid_manager_parity_disks:
+      - level: 1
+        path: /mnt/parity1/snapraid.parity
+      - level: 2
+        path: /mnt/parity2/snapraid.parity
+    snapraid_manager_content_files:
+      - /var/snapraid.content
+      - /mnt/data1/.snapraid.content
+      - /mnt/data2/.snapraid.content
+    snapraid_manager_excludes:
+      - "*.unrecoverable"
+      - /lost+found/
+  tasks:
+    - name: Run core validation
+      ansible.builtin.include_role:
+        name: ansible-role-snapraid-manager
+        tasks_from: validate
+        public: true
+
+    - name: Verify explicit array identities and content paths
+      ansible.builtin.assert:
+        that:
+          - "'data d1 /mnt/data1' in rendered"
+          - "'data d2 /mnt/data2' in rendered"
+          - "'parity /mnt/parity1/snapraid.parity' in rendered"
+          - "'2-parity /mnt/parity2/snapraid.parity' in rendered"
+          - "'content /mnt/data1/.snapraid.content' in rendered"
+          - "'content /mnt/data2/.snapraid.content' in rendered"
+          - "'exclude *.unrecoverable' in rendered"
+      vars:
+        rendered: "{{ lookup('ansible.builtin.template', '../templates/snapraid.conf.j2') }}"
+
+    - name: Verify reordering data disks preserves identities
+      ansible.builtin.assert:
+        that:
+          - "'data d1 /mnt/data1' in rendered"
+          - "'data d2 /mnt/data2' in rendered"
+      vars:
+        snapraid_manager_data_disks:
+          - name: d2
+            path: /mnt/data2
+          - name: d1
+            path: /mnt/data1
+        rendered: "{{ lookup('ansible.builtin.template', '../templates/snapraid.conf.j2') }}"
+
+    - name: Verify daemon is opt-in
+      ansible.builtin.assert:
+        that:
+          - not snapraid_manager_daemon_enabled
+
+    - name: Verify upstream CLI version formats
+      ansible.builtin.assert:
+        that:
+          - item is search('(?i)^snapraid( cli)? v[0-9]+\.[0-9]+')
+          - (item | regex_search('[0-9]+\.[0-9]+')) is version('15.1', '>=')
+      loop:
+        - 'SnapRAID CLI v15.1 by Andrea Mazzoleni, https://www.snapraid.it'
+        - 'snapraid v15.1 by Andrea Mazzoleni'
+
+    - name: Validate daemon defaults
+      ansible.builtin.include_role:
+        name: ansible-role-snapraid-manager
+        tasks_from: validate-daemon
+        public: true
+
+    - name: Verify daemon scheduling and network are safe by default
+      ansible.builtin.assert:
+        that:
+          - "'maintenance_schedule = \n' in rendered"
+          - "'net_port = 127.0.0.1:7627' in rendered"
+          - "'spindown_idle_minutes = 0' in rendered"
+          - "'sys_engine = /usr/bin/snapraid' in rendered"
+          - "'hook_script = /usr/local/libexec/snapraid-manager-mount-check' in rendered"
+      vars:
+        rendered: "{{ lookup('ansible.builtin.template', '../templates/snapraidd.conf.j2') }}"
+
+    - name: Verify user options merge with security defaults
+      ansible.builtin.assert:
+        that:
+          - "'maintenance_schedule = Mon 03:00, Thu 04:00' in rendered"
+          - "'net_port = 127.0.0.1:7627' in rendered"
+          - "'net_config_full_access = 0' in rendered"
+      vars:
+        snapraid_manager_daemon_options:
+          maintenance_schedule: Mon 03:00, Thu 04:00
+        rendered: "{{ lookup('ansible.builtin.template', '../templates/snapraidd.conf.j2') }}"
+
+    - name: Verify service uses explicit CLI configuration
+      ansible.builtin.assert:
+        that:
+          - "'-C \"/etc/snapraid.conf\"' in rendered"
+          - "'RequiresMountsFor=' in rendered"
+      vars:
+        rendered: "{{ lookup('ansible.builtin.template', '../templates/daemon-override.conf.j2') }}"
+
+    - name: Verify invalid configurations are rejected
+      ansible.builtin.include_tasks: reject.yml
+      loop:
+        - name: No data disks
+          data: []
+          expected: Validate array collections
+        - name: Duplicate disk names
+          data:
+            - { name: d1, path: /mnt/data1 }
+            - { name: d1, path: /mnt/data2 }
+          expected: Validate stable and unique array identities
+        - name: Repeated parity level
+          parity:
+            - { level: 1, path: /mnt/parity1/snapraid.parity }
+            - { level: 1, path: /mnt/parity2/snapraid.parity }
+          expected: Validate stable and unique array identities
+        - name: Configuration directive injection
+          excludes: ["*.tmp\ndata injected /tmp"]
+          expected: Validate exclusion patterns
+        - name: Unsupported platform
+          distribution: Fedora
+          expected: Validate supported host
+      loop_control:
+        loop_var: snapraid_manager_test_case
+        label: "{{ snapraid_manager_test_case.name }}"

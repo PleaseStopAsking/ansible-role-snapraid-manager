@@ -1,0 +1,5 @@
+# {{ ansible_managed }}
+# UI/API changes are overwritten on the next Ansible run.
+{% for option, value in snapraid_manager_daemon_effective_options | dictsort %}
+{{ option }} = {{ value }}
+{% endfor %}

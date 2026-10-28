@@ -1,0 +1,19 @@
+---
+- name: Converge SnapRAID in disposable Linux container
+  hosts: all
+  gather_facts: false
+  vars_files:
+    - array.yml
+  vars:
+    snapraid_manager_daemon_enabled: "{{ snapraid_manager_test_daemon | default(false) | bool }}"
+  pre_tasks:
+    - name: Wait for container systemd control socket
+      ansible.builtin.wait_for:
+        path: /run/systemd/private
+        state: present
+        timeout: 60
+
+    - name: Gather container facts
+      ansible.builtin.setup:
+  roles:
+    - role: ansible-role-snapraid-manager

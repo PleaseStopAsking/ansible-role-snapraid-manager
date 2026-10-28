@@ -1,0 +1,16 @@
+# {{ ansible_managed }}
+{% for disk in snapraid_manager_parity_disks | sort(attribute='level') %}
+{{ 'parity' if disk.level == 1 else (disk.level | string) ~ '-parity' }} {{ disk.path }}
+{% endfor %}
+{% for content_file in snapraid_manager_content_files %}
+content {{ content_file }}
+{% endfor %}
+{% for disk in snapraid_manager_data_disks %}
+data {{ disk.name }} {{ disk.path }}
+{% endfor %}
+{% if snapraid_manager_exclude_hidden %}
+nohidden
+{% endif %}
+{% for pattern in snapraid_manager_excludes %}
+exclude {{ pattern }}
+{% endfor %}
