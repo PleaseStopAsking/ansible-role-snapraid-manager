@@ -9,7 +9,7 @@ the role creates no cron jobs or systemd timers.
 
 ## Support and requirements
 
-- Initial target matrix: Debian 12/13 and Ubuntu 24.04, amd64. Support remains provisional until native integration CI passes.
+- CI-tested platforms: Debian 12/13 and Ubuntu 24.04, amd64.
 - Controller: ansible-core 2.19 or newer; Python and `python3-apt` on targets.
 - Root privileges (`become: true`) and gathered facts.
 - Systemd is required only when daemon integration is enabled.
@@ -175,8 +175,11 @@ is running; concurrent writers can race with configuration inspection and replac
 - Host-safe validation/rendering suite: 65 successful tasks, including five expected rejection cases.
 - CLI package installation and zero-change second runs: passed on Debian 12, Debian 13, and Ubuntu 24.04 amd64 containers.
 - Both pinned package checksums: verified against downloaded release assets.
-- Full daemon lifecycle suite: not passed locally; requires native amd64 CI before publication.
+- Full daemon lifecycle suite: passed on native amd64 CI for Debian 12/13 and Ubuntu 24.04, including idempotence, drift restoration, mount checks, and disabling integration.
+- Controller matrix: lint and host-safe tests passed with ansible-core 2.19 and 2.21.
 - Live-array migration, physical SMART telemetry, spindown, and external notifications: not exercised.
+
+Native verification: [successful CI run](https://github.com/PleaseStopAsking/ansible-role-snapraid-manager/actions/runs/40701939322).
 
 Check mode predicts configuration/package changes but does not install downloaded
 packages or start the daemon. A fresh-host check is not a substitute for convergence.
