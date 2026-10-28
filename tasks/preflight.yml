@@ -107,6 +107,21 @@
   check_mode: false
   when: snapraid_manager_daemon_enabled
 
+- name: Check whether APT package indexes exist
+  ansible.builtin.find:
+    paths: /var/lib/apt/lists
+    patterns: '*_Packages*'
+    file_type: file
+  register: snapraid_manager_apt_indexes
+  when: snapraid_manager_install or snapraid_manager_daemon_enabled
+
+- name: Refresh missing APT package indexes
+  ansible.builtin.apt:
+    update_cache: true
+  when:
+    - snapraid_manager_install or snapraid_manager_daemon_enabled
+    - snapraid_manager_apt_indexes.matched == 0
+
 - name: Stop daemon before changing packages or configuration
   ansible.builtin.systemd_service:
     name: snapraidd.service
