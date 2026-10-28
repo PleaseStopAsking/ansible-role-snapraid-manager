@@ -51,3 +51,27 @@ jobs:
       - name: Run integration and idempotence tests
         working-directory: ansible-role-snapraid-manager
         run: bash tests/integration.sh '${{ matrix.image }}'
+
+  release:
+    name: Create GitHub release
+    if: >-
+      startsWith(github.ref, 'refs/tags/v') &&
+      needs.lint-and-unit.result == 'success' &&
+      needs.integration.result == 'success'
+    needs:
+      - lint-and-unit
+      - integration
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Validate release tag
+        run: |
+          if [[ ! "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Release tags must use vMAJOR.MINOR.PATCH (for example v1.0.0)." >&2
+            exit 1
+          fi
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes
