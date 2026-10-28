@@ -50,6 +50,39 @@
   loop_control:
     label: "{{ item.key }}"
 
+- name: Validate Healthchecks ownership and execution settings
+  ansible.builtin.assert:
+    that:
+      - "'notify_heartbeat' not in snapraid_manager_daemon_options"
+      - snapraid_manager_daemon_effective_options.notify_run_as_user in ['', 'root']
+      - snapraid_manager_healthchecks_timeout | type_debug == 'int'
+      - snapraid_manager_healthchecks_timeout >= 1
+      - snapraid_manager_healthchecks_timeout <= 60
+      - snapraid_manager_healthchecks_retries | type_debug == 'int'
+      - snapraid_manager_healthchecks_retries >= 0
+      - snapraid_manager_healthchecks_retries <= 5
+    fail_msg: >-
+      Healthchecks owns notify_heartbeat and requires root notification access,
+      an integer timeout of 1-60 seconds, and 0-5 retries.
+  when: snapraid_manager_healthchecks_enabled
+
+- name: Validate Healthchecks secret ping URL
+  ansible.builtin.assert:
+    that:
+      - snapraid_manager_healthchecks_ping_url is string
+      - snapraid_manager_healthchecks_ping_url | length > 0
+      - snapraid_manager_healthchecks_ping_url | urlsplit('scheme') == 'https'
+      - snapraid_manager_healthchecks_ping_url | urlsplit('hostname') is not none
+      - snapraid_manager_healthchecks_ping_url | urlsplit('username') is none
+      - snapraid_manager_healthchecks_ping_url | urlsplit('password') is none
+      - snapraid_manager_healthchecks_ping_url | urlsplit('path') | length > 1
+      - snapraid_manager_healthchecks_ping_url | urlsplit('query') == ''
+      - snapraid_manager_healthchecks_ping_url | urlsplit('fragment') == ''
+      - snapraid_manager_healthchecks_ping_url.split() | join('') == snapraid_manager_healthchecks_ping_url
+      - snapraid_manager_healthchecks_ping_url | to_json | length == (snapraid_manager_healthchecks_ping_url | length) + 2
+  when: snapraid_manager_healthchecks_enabled
+  no_log: true
+
 - name: Validate required mount paths
   ansible.builtin.assert:
     that:

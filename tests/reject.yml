@@ -4,11 +4,17 @@
     - name: Run validation on invalid input
       ansible.builtin.include_role:
         name: ansible-role-snapraid-manager
-        tasks_from: validate
+        tasks_from: "{{ snapraid_manager_test_case.tasks_from | default('validate') }}"
       vars:
         ansible_facts:
           distribution: "{{ snapraid_manager_test_case.distribution | default('Debian') }}"
           architecture: x86_64
+          service_mgr: systemd
+        snapraid_manager_daemon_enabled: "{{ snapraid_manager_test_case.daemon_enabled | default(false) }}"
+        snapraid_manager_healthchecks_enabled: "{{ snapraid_manager_test_case.healthchecks_enabled | default(false) }}"
+        snapraid_manager_healthchecks_ping_url: "{{ snapraid_manager_test_case.ping_url | default('https://hc-ping.com/test-check-identifier') }}"
+        snapraid_manager_healthchecks_timeout: "{{ snapraid_manager_test_case.timeout | default(10) }}"
+        snapraid_manager_daemon_options: "{{ snapraid_manager_test_case.daemon_options | default({}) }}"
         snapraid_manager_data_disks: "{{ snapraid_manager_test_case.data | default([{'name': 'd1', 'path': '/mnt/data1'}]) }}"
         snapraid_manager_parity_disks: "{{ snapraid_manager_test_case.parity | default([{'level': 1, 'path': '/mnt/parity1/snapraid.parity'}]) }}"
         snapraid_manager_excludes: "{{ snapraid_manager_test_case.excludes | default([]) }}"

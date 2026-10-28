@@ -1,0 +1,63 @@
+---
+- name: Test Healthchecks credentials only in a disposable Linux container
+  hosts: all
+  gather_facts: false
+  vars:
+    snapraid_manager_healthchecks_enabled: true
+    snapraid_manager_healthchecks_ping_url: https://healthchecks.invalid/test-check-identifier
+  tasks:
+    - name: Apply real Healthchecks credential tasks
+      ansible.builtin.include_role:
+        name: ansible-role-snapraid-manager
+        tasks_from: healthchecks
+
+    - name: Inspect Healthchecks credential file
+      ansible.builtin.stat:
+        path: /etc/snapraid-manager/healthchecks.curl
+      register: snapraid_manager_test_healthchecks_file
+
+    - name: Verify credential lifecycle matches the integration switch
+      ansible.builtin.assert:
+        that:
+          - snapraid_manager_test_healthchecks_file.stat.exists == snapraid_manager_healthchecks_enabled
+
+    - name: Verify enabled Healthchecks configuration
+      when: snapraid_manager_healthchecks_enabled
+      block:
+        - name: Inspect restricted Healthchecks directory
+          ansible.builtin.stat:
+            path: /etc/snapraid-manager
+          register: snapraid_manager_test_healthchecks_directory
+
+        - name: Verify root-only permissions
+          ansible.builtin.assert:
+            that:
+              - snapraid_manager_test_healthchecks_file.stat.mode == '0600'
+              - snapraid_manager_test_healthchecks_file.stat.uid == 0
+              - snapraid_manager_test_healthchecks_file.stat.gid == 0
+              - snapraid_manager_test_healthchecks_directory.stat.mode == '0700'
+              - snapraid_manager_test_healthchecks_directory.stat.uid == 0
+
+        - name: Verify curl accepts its protected configuration without sending a ping
+          ansible.builtin.command:
+            argv:
+              - /usr/bin/curl
+              - --disable
+              - --config
+              - /etc/snapraid-manager/healthchecks.curl
+              - --version
+          changed_when: false
+
+        - name: Read protected Healthchecks test configuration
+          ansible.builtin.slurp:
+            src: /etc/snapraid-manager/healthchecks.curl
+          register: snapraid_manager_test_healthchecks_content
+          no_log: true
+
+        - name: Verify the configured endpoint and transfer policy
+          ansible.builtin.assert:
+            that:
+              - snapraid_manager_healthchecks_ping_url in (snapraid_manager_test_healthchecks_content.content | b64decode)
+              - "'proto = \"=https\"' in (snapraid_manager_test_healthchecks_content.content | b64decode)"
+              - "'retry-max-time = 60' in (snapraid_manager_test_healthchecks_content.content | b64decode)"
+          no_log: true

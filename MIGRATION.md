@@ -95,9 +95,20 @@ After the unscheduled validation phase, use `maintenance_schedule: "01:00"` to
 match the old nightly cron time. Review timezone/DST behavior for the selected
 daemon release rather than assuming every cron behavior carries over.
 
-The daemon heartbeat is a successful-maintenance ping, not a complete replacement
-for the old shell wrapper's start/success sequence. Configure `notify_start`
-separately if start pings are needed, accounting for its additional event types.
+The optional Healthchecks integration replaces the old wrapper's success ping:
+
+```yaml
+snapraid_manager_healthchecks_enabled: true
+snapraid_manager_healthchecks_ping_url: "https://hc-ping.com/{{ snapraid_healthcheck_uuid }}"
+```
+
+For other inventories, supply the complete success ping URL from Ansible Vault.
+Do not also set `notify_heartbeat` in the daemon options; the integration manages
+it and stores the URL in a root-only curl configuration file. This is a
+successful-maintenance ping, not a complete replacement for the old shell wrapper's
+start/success sequence. Configure `notify_start` separately if start pings are
+needed, accounting for its additional event types. Match the Healthchecks schedule
+and grace period to the daemon's maintenance policy.
 Pushover credentials cannot simply be copied into old variable names: provision a
 notification helper and reference it via `notify_result`, or choose another provider.
 

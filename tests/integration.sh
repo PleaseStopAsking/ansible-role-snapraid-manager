@@ -31,6 +31,12 @@ ansible-playbook "${playbook_args[@]}" tests/converge.yml
 ansible-playbook "${playbook_args[@]}" tests/converge.yml | tee "$log_file"
 grep -Eq 'changed=0[[:space:]]+unreachable=0[[:space:]]+failed=0' "$log_file"
 
+ansible-playbook "${playbook_args[@]}" tests/healthchecks.yml -e '{"snapraid_manager_healthchecks_enabled": false}'
+ansible-playbook "${playbook_args[@]}" tests/healthchecks.yml
+ansible-playbook "${playbook_args[@]}" tests/healthchecks.yml | tee "$log_file"
+grep -Eq 'changed=0[[:space:]]+unreachable=0[[:space:]]+failed=0' "$log_file"
+ansible-playbook "${playbook_args[@]}" tests/healthchecks.yml -e '{"snapraid_manager_healthchecks_enabled": false}'
+
 if [[ "$test_scope" = core ]]; then
     exit 0
 fi

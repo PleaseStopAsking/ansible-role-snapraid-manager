@@ -63,6 +63,7 @@
       ansible.builtin.assert:
         that:
           - not snapraid_manager_daemon_enabled
+          - not snapraid_manager_healthchecks_enabled
 
     - name: Verify upstream CLI version formats
       ansible.builtin.assert:
@@ -79,6 +80,14 @@
         tasks_from: validate-daemon
         public: true
 
+    - name: Validate enabled Healthchecks configuration
+      ansible.builtin.include_role:
+        name: ansible-role-snapraid-manager
+        tasks_from: validate-daemon
+      vars:
+        snapraid_manager_healthchecks_enabled: true
+        snapraid_manager_healthchecks_ping_url: https://hc-ping.com/test-check-identifier
+
     - name: Verify daemon scheduling and network are safe by default
       ansible.builtin.assert:
         that:
@@ -89,6 +98,20 @@
           - "'hook_script = /usr/local/libexec/snapraid-manager-mount-check' in rendered"
       vars:
         rendered: "{{ lookup('ansible.builtin.template', '../templates/snapraidd.conf.j2') }}"
+
+    - name: Verify Healthchecks heartbeat keeps the secret out of daemon commands
+      ansible.builtin.assert:
+        that:
+          - "'notify_heartbeat = /usr/bin/curl --disable --config /etc/snapraid-manager/healthchecks.curl' in daemon_config"
+          - snapraid_manager_healthchecks_ping_url not in daemon_config
+          - "'url = \"https://hc-ping.com/test-check-identifier\"' in curl_config"
+          - "'max-time = 10' in curl_config"
+          - "'retry = 3' in curl_config"
+      vars:
+        snapraid_manager_healthchecks_enabled: true
+        snapraid_manager_healthchecks_ping_url: https://hc-ping.com/test-check-identifier
+        daemon_config: "{{ lookup('ansible.builtin.template', '../templates/snapraidd.conf.j2') }}"
+        curl_config: "{{ lookup('ansible.builtin.template', '../templates/healthchecks.curl.j2') }}"
 
     - name: Verify user options merge with security defaults
       ansible.builtin.assert:
@@ -131,6 +154,41 @@
         - name: Unsupported platform
           distribution: Fedora
           expected: Validate supported host
+        - name: Healthchecks requires daemon integration
+          healthchecks_enabled: true
+          expected: Validate role switches and configuration paths
+        - name: Healthchecks rejects an empty ping URL
+          tasks_from: validate-daemon
+          healthchecks_enabled: true
+          ping_url: ''
+          expected: Validate Healthchecks secret ping URL
+        - name: Healthchecks requires HTTPS
+          tasks_from: validate-daemon
+          healthchecks_enabled: true
+          ping_url: http://hc-ping.com/test-check-identifier
+          expected: Validate Healthchecks secret ping URL
+        - name: Healthchecks rejects configuration injection
+          tasks_from: validate-daemon
+          healthchecks_enabled: true
+          ping_url: "https://hc-ping.com/test\nverbose"
+          expected: Validate Healthchecks secret ping URL
+        - name: Healthchecks rejects conflicting heartbeat commands
+          tasks_from: validate-daemon
+          healthchecks_enabled: true
+          daemon_options:
+            notify_heartbeat: /usr/bin/true
+          expected: Validate Healthchecks ownership and execution settings
+        - name: Healthchecks rejects an unprivileged notification user
+          tasks_from: validate-daemon
+          healthchecks_enabled: true
+          daemon_options:
+            notify_run_as_user: nobody
+          expected: Validate Healthchecks ownership and execution settings
+        - name: Healthchecks requires a bounded timeout
+          tasks_from: validate-daemon
+          healthchecks_enabled: true
+          timeout: 0
+          expected: Validate Healthchecks ownership and execution settings
       loop_control:
         loop_var: snapraid_manager_test_case
         label: "{{ snapraid_manager_test_case.name }}"

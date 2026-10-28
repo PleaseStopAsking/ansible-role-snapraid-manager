@@ -32,6 +32,9 @@
     group: root
     mode: "0755"
 
+- name: Manage optional Healthchecks credentials
+  ansible.builtin.include_tasks: healthchecks.yml
+
 - name: Configure daemon with full Ansible ownership
   ansible.builtin.template:
     src: snapraidd.conf.j2

@@ -29,7 +29,7 @@ snapraid_manager_daemon_defaults:
   hook_run_as_user: ""
   notify_syslog_enabled: 1
   notify_syslog_level: info
-  notify_heartbeat: ""
+  notify_heartbeat: "{{ '/usr/bin/curl --disable --config /etc/snapraid-manager/healthchecks.curl' if snapraid_manager_healthchecks_enabled else '' }}"
   notify_start: ""
   notify_result: ""
   notify_result_level: warning

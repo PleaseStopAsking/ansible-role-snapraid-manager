@@ -11,6 +11,8 @@
     that:
       - snapraid_manager_install is boolean
       - snapraid_manager_daemon_enabled is boolean
+      - snapraid_manager_healthchecks_enabled is boolean
+      - not snapraid_manager_healthchecks_enabled or snapraid_manager_daemon_enabled
       - snapraid_manager_allow_daemon_restart is boolean
       - snapraid_manager_exclude_hidden is boolean
       - snapraid_manager_version is match('^[0-9]+\.[0-9]+(\.[0-9]+)?$')

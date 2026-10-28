@@ -24,6 +24,10 @@ snapraid_manager_daemon_package_url: >-
 snapraid_manager_daemon_package_checksum: "sha256:7f8ddbf41f6bb425371095f4b156f53c293609d2d64a9a012c319b20f1313e5d"
 snapraid_manager_daemon_options: {}
 snapraid_manager_daemon_hook: ""
+snapraid_manager_healthchecks_enabled: false
+snapraid_manager_healthchecks_ping_url: ""
+snapraid_manager_healthchecks_timeout: 10
+snapraid_manager_healthchecks_retries: 3
 snapraid_manager_required_mounts: >-
   {{ (snapraid_manager_data_disks | map(attribute='path') | list
       + snapraid_manager_parity_disks | map(attribute='path') | map('dirname') | list) | unique | list }}

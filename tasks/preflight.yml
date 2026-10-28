@@ -33,7 +33,10 @@
               'template': 'daemon-override.conf.j2', 'mode': '0644'},
              {'path': '/usr/local/libexec/snapraid-manager-mount-check',
               'template': 'mount-check.sh.j2', 'mode': '0755'}]
-            if snapraid_manager_daemon_enabled else []) }}
+            if snapraid_manager_daemon_enabled else [])
+         + ([{'path': '/etc/snapraid-manager/healthchecks.curl',
+              'template': 'healthchecks.curl.j2', 'mode': '0600'}]
+            if snapraid_manager_daemon_enabled and snapraid_manager_healthchecks_enabled else []) }}
 
 - name: Inspect managed files without exposing configuration content
   ansible.builtin.stat:

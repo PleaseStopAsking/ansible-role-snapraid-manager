@@ -79,7 +79,6 @@ snapraid_manager_daemon_options:
   sync_threshold_updates: 100
   scrub_percentage: 12
   scrub_older_than: 10
-  notify_heartbeat: "curl -fsS --max-time 30 --retry 3 https://hc-ping.com/YOUR_UUID"
 ```
 
 | Variable | Default | Purpose |
@@ -123,6 +122,45 @@ subject to the same restart permission. Packages, configuration, logs, and suppo
 files are retained. An unrelated daemon installation is not disabled just because
 the default integration switch is off.
 
+## Optional Healthchecks.io integration
+
+The integration is disabled by default and requires daemon integration. Enable it
+with the complete HTTPS ping URL from your Healthchecks.io check, preferably stored
+in Ansible Vault:
+
+```yaml
+snapraid_manager_daemon_enabled: true
+snapraid_manager_healthchecks_enabled: true
+snapraid_manager_healthchecks_ping_url: "{{ vault_snapraid_healthchecks_ping_url }}"
+```
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `snapraid_manager_healthchecks_enabled` | `false` | Manage a successful-maintenance heartbeat. |
+| `snapraid_manager_healthchecks_ping_url` | `""` | Secret HTTPS success endpoint, without a query, fragment, or embedded username/password. Self-hosted HTTPS endpoints are supported. |
+| `snapraid_manager_healthchecks_timeout` | `10` | Connection and per-attempt timeout in seconds, from 1 to 60. |
+| `snapraid_manager_healthchecks_retries` | `3` | Transient-error retries, from 0 to 5, with a 60-second retry budget. |
+
+The daemon invokes curl only after successful maintenance. No ping is sent during
+deployment. Missing or failed maintenance produces no success ping; configure the
+check's schedule and grace period in Healthchecks.io to detect this. This integration
+does not send start, failure, or daemon-liveness pings, and does not create checks
+through the Healthchecks management API.
+
+The URL is stored in `/etc/snapraid-manager/healthchecks.curl` (root:root, `0600`)
+inside a `0700` directory. Only the config-file path appears in the daemon's command.
+Template output/diffs and curl diagnostics are suppressed; curl's response is
+discarded. The integration owns `notify_heartbeat`, so do not also set that option
+in `snapraid_manager_daemon_options`. `notify_run_as_user` must be empty or `root`
+so curl can read the credentials. Other notification providers remain independent.
+
+Enabling, changing credentials/settings, or disabling Healthchecks respects the
+existing `snapraid_manager_allow_daemon_restart` guard on an active daemon. With
+daemon integration still enabled, setting `snapraid_manager_healthchecks_enabled`
+to `false` clears the managed heartbeat and removes its credential file. Disabling
+daemon integration altogether follows the existing retention policy and keeps its
+configuration files, including Healthchecks credentials.
+
 ## Network and notifications
 
 Remote access must be explicitly configured using `net_port`, `net_acl`, and
@@ -135,7 +173,8 @@ exempt from authentication, so network restrictions still matter.
 Keep `net_config_full_access: 0` unless you deliberately want remote modification
 of sensitive command/hook settings. This flag does not make the entire UI read-only.
 
-Healthchecks uses `notify_heartbeat`. Other notification providers use
+The optional Healthchecks integration manages `notify_heartbeat`. With it disabled,
+you may still supply a custom heartbeat command yourself. Other notification providers use
 `notify_result`, optionally `notify_start`, and existing commands or scripts.
 Pushover is not a built-in integration in this role. For SMTP, prefer a dedicated
 credentials file and curl's `--netrc-file`; this role does not overwrite `/root/.netrc`.
@@ -143,6 +182,14 @@ Provision notification tools/scripts separately and ensure the notification user
 can read required credentials. Treat all hook and notification commands as trusted
 code. The role suppresses daemon config diffs/task output but cannot prevent
 secrets in user-supplied commands from appearing in process arguments or daemon logs.
+
+## Dependency updates
+
+Dependabot checks GitHub Actions weekly. Minor and patch action updates are
+grouped; major updates remain separate for review. Pull requests run the existing
+CI matrix and are not automatically merged. SnapRAID release versions/checksums,
+inline pip installs, Ansible collections, and the platform test matrix still
+require deliberate maintenance.
 
 ## Testing
 
@@ -159,10 +206,12 @@ containers with systemd and tmpfs test disks. They never attach host storage dis
 Full integration requires a native amd64 Docker host. The amd64 daemon's child
 execution and forking service startup did not work reliably under this development
 machine's ARM Docker emulation; direct CLI execution and core convergence did work.
-Use `bash tests/integration.sh debian:13 core` for CLI-only convergence/idempotence
+Use `bash tests/integration.sh debian:13 core` for CLI and credential-file convergence/idempotence
 under emulation. Core-only mode is not a substitute for the full native CI gate.
 Tests cover package installation, daemon startup, core/daemon idempotence, runtime
 mount checks, configuration ownership, restart protection, and disabling integration.
+Healthchecks tests verify secret-file permissions, curl configuration parsing,
+idempotence, and cleanup, without contacting any external monitoring endpoint.
 CI targets Debian 12/13 and Ubuntu 24.04. Real-disk SMART/spindown behavior and a
 production-array migration require separate operator validation.
 
@@ -172,7 +221,7 @@ is running; concurrent writers can race with configuration inspection and replac
 ### Current validation status
 
 - Ansible lint: production profile, no failures or warnings.
-- Host-safe validation/rendering suite: 65 successful tasks, including five expected rejection cases.
+- Host-safe validation/rendering suite includes optional Healthchecks configuration and rejection of unsafe inputs.
 - CLI package installation and zero-change second runs: passed on Debian 12, Debian 13, and Ubuntu 24.04 amd64 containers.
 - Both pinned package checksums: verified against downloaded release assets.
 - Full daemon lifecycle suite: passed on native amd64 CI for Debian 12/13 and Ubuntu 24.04, including idempotence, drift restoration, mount checks, and disabling integration.
