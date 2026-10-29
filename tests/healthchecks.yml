@@ -18,6 +18,7 @@
       ansible.builtin.include_role:
         name: ansible-role-snapraid-manager
         tasks_from: healthchecks
+        public: true
 
     - name: Inspect Healthchecks credential file
       ansible.builtin.stat:
