@@ -12,6 +12,7 @@
           service_mgr: systemd
         snapraid_manager_daemon_enabled: "{{ snapraid_manager_test_case.daemon_enabled | default(false) }}"
         snapraid_manager_healthchecks_enabled: "{{ snapraid_manager_test_case.healthchecks_enabled | default(false) }}"
+        snapraid_manager_healthchecks_include_report: "{{ snapraid_manager_test_case.include_report | default(false) }}"
         snapraid_manager_healthchecks_ping_url: "{{ snapraid_manager_test_case.ping_url | default('https://hc-ping.com/test-check-identifier') }}"
         snapraid_manager_healthchecks_timeout: "{{ snapraid_manager_test_case.timeout | default(10) }}"
         snapraid_manager_daemon_options: "{{ snapraid_manager_test_case.daemon_options | default({}) }}"

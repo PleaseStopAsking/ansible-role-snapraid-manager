@@ -41,6 +41,25 @@
   diff: false
   no_log: true
 
+- name: Install protected Healthchecks report log configuration
+  ansible.builtin.template:
+    src: healthchecks-log.curl.j2
+    dest: /etc/snapraid-manager/healthchecks-log.curl
+    owner: root
+    group: root
+    mode: '0600'
+  when:
+    - snapraid_manager_healthchecks_enabled
+    - snapraid_manager_healthchecks_include_report
+  diff: false
+  no_log: true
+
+- name: Remove disabled Healthchecks report log configuration
+  ansible.builtin.file:
+    path: /etc/snapraid-manager/healthchecks-log.curl
+    state: absent
+  when: not snapraid_manager_healthchecks_enabled or not snapraid_manager_healthchecks_include_report
+
 - name: Install Healthchecks start and result notifier
   ansible.builtin.template:
     src: healthchecks-notify.sh.j2

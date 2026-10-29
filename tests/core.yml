@@ -126,6 +126,86 @@
         notify_script: "{{ lookup('ansible.builtin.template', '../templates/healthchecks-notify.sh.j2') }}"
         fail_curl_config: "{{ lookup('ansible.builtin.template', '../templates/healthchecks-fail.curl.j2') }}"
 
+    - name: Verify opt-in reports enable informational results without changing the heartbeat
+      ansible.builtin.assert:
+        that:
+          - "'notify_result_level = info' in daemon_config"
+          - "'notify_heartbeat = /usr/bin/curl --disable --config /etc/snapraid-manager/healthchecks.curl' in daemon_config"
+          - snapraid_manager_healthchecks_ping_url not in daemon_config
+          - "'url = \"https://hc-ping.com/test-check-identifier/log\"' in log_config"
+      vars:
+        snapraid_manager_healthchecks_enabled: true
+        snapraid_manager_healthchecks_include_report: true
+        snapraid_manager_healthchecks_ping_url: https://hc-ping.com/test-check-identifier
+        daemon_config: "{{ lookup('ansible.builtin.template', '../templates/snapraidd.conf.j2') }}"
+        log_config: "{{ lookup('ansible.builtin.template', '../templates/healthchecks-log.curl.j2') }}"
+
+    - name: Test Healthchecks notifier without network requests
+      block:
+        - name: Create temporary notifier test directory
+          ansible.builtin.tempfile:
+            state: directory
+          register: snapraid_manager_test_notify_dir
+
+        - name: Install fake curl to capture arguments and request body
+          ansible.builtin.copy:
+            dest: "{{ snapraid_manager_test_notify_dir.path }}/curl"
+            mode: '0700'
+            content: |
+              #!/bin/sh
+              printf '%s\n' "$@"
+              case "$*" in
+                  *--data-binary*) cat ;;
+              esac
+
+        - name: Render both notifier modes with fake curl
+          ansible.builtin.copy:
+            dest: "{{ snapraid_manager_test_notify_dir.path }}/notify-{{ item }}"
+            mode: '0700'
+            content: >-
+              {{ lookup('ansible.builtin.template', '../templates/healthchecks-notify.sh.j2')
+                 | replace('/usr/bin/curl', snapraid_manager_test_notify_dir.path ~ '/curl') }}
+          vars:
+            snapraid_manager_healthchecks_include_report: "{{ item }}"
+          loop: [false, true]
+
+        - name: Exercise notifier routing and body handling
+          ansible.builtin.command:
+            argv:
+              - /bin/sh
+              - "{{ snapraid_manager_test_notify_dir.path }}/notify-{{ item.reports }}"
+              - "{{ item.event | default('result') }}"
+              - "{{ item.task | default('maintenance') }}"
+              - "{{ item.level }}"
+            stdin: "Maintenance report: paths with spaces and $literal shell text"
+          changed_when: false
+          register: snapraid_manager_test_notify_result
+          failed_when: >-
+            snapraid_manager_test_notify_result.rc != 0 or
+            (item.endpoint | default('')) not in snapraid_manager_test_notify_result.stdout or
+            (item.endpoint is not defined and snapraid_manager_test_notify_result.stdout != '') or
+            (('Maintenance report: paths with spaces and $literal shell text' in snapraid_manager_test_notify_result.stdout)
+             != (item.body | default(false)))
+          loop:
+            - {reports: false, level: info}
+            - {reports: false, level: warning}
+            - {reports: false, level: error, endpoint: healthchecks-fail.curl}
+            - {reports: false, level: critical, endpoint: healthchecks-fail.curl}
+            - {reports: true, level: info, endpoint: healthchecks-log.curl, body: true}
+            - {reports: true, level: warning, endpoint: healthchecks-log.curl, body: true}
+            - {reports: true, level: error, endpoint: healthchecks-fail.curl, body: true}
+            - {reports: true, level: critical, endpoint: healthchecks-fail.curl, body: true}
+            - {reports: true, event: start, level: info, endpoint: healthchecks-start.curl}
+            - {reports: true, task: heal, level: error}
+            - {reports: true, task: refresh, level: info}
+            - {reports: true, task: undelete, level: warning}
+      always:
+        - name: Remove temporary notifier test files
+          ansible.builtin.file:
+            path: "{{ snapraid_manager_test_notify_dir.path }}"
+            state: absent
+          when: snapraid_manager_test_notify_dir.path is defined
+
     - name: Verify user options merge with security defaults
       ansible.builtin.assert:
         that:
@@ -169,6 +249,9 @@
           expected: Validate supported host
         - name: Healthchecks requires daemon integration
           healthchecks_enabled: true
+          expected: Validate role switches and configuration paths
+        - name: Healthchecks report switch must be boolean
+          include_report: "yes"
           expected: Validate role switches and configuration paths
         - name: Healthchecks rejects an empty ping URL
           tasks_from: validate-daemon

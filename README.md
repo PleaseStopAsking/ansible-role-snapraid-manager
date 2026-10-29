@@ -91,6 +91,7 @@ snapraid_manager_healthchecks_ping_url: "{{ vault_snapraid_healthchecks_ping_url
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `snapraid_manager_healthchecks_enabled` | `false` | Send maintenance-start, success, and failure pings. |
+| `snapraid_manager_healthchecks_include_report` | `false` | Include maintenance reports in Healthchecks POST bodies. |
 | `snapraid_manager_healthchecks_ping_url` | `""` | Secret HTTPS success endpoint, without a query, fragment, or embedded username/password. Self-hosted HTTPS endpoints are supported. |
 | `snapraid_manager_healthchecks_timeout` | `10` | Connection and per-attempt timeout in seconds, from 1 to 60. |
 | `snapraid_manager_healthchecks_retries` | `3` | Transient-error retries, from 0 to 5, with a 60-second retry budget. |
@@ -100,6 +101,15 @@ after successful maintenance the daemon sends the regular success ping, and a
 maintenance report at `error` or `critical` sends `/fail`. 
 
 The start and failure pings are filtered to maintenance, so heal, undelete, refresh, SMART, and unrelated reports do not signal this check.
+
+Set `snapraid_manager_healthchecks_include_report: true` to upload the daemon's plain-text maintenance report.
+
+Informational and warning reports go to `/log`
+without changing check status; error and critical reports go to `/fail` with the report attached. The separate success heartbeat remains unchanged. This enables `info`-level result notifications, but only maintenance reports are uploaded.
+
+Healthchecks.io stores the first 100 kB of each body. Reports can include filenames, disk identifiers, and host details; leave this disabled if those must remain local.
+
+The additional `/log` URL is stored in a root-only curl configuration, removed when report uploads or Healthchecks integration are disabled.
 
 The success, `/start`, and `/fail` URLs are stored in separate files under
 `/etc/snapraid-manager` (`root:root`, `0600`) inside a `0700` directory. One shared root-owned helper dispatches start and failure events to their endpoint configs.
