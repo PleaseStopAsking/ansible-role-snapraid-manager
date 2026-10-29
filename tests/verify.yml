@@ -49,9 +49,8 @@
       changed_when: false
 
     - name: Unmount disposable test disk
-      ansible.posix.mount:
-        path: /mnt/data1
-        state: unmounted
+      ansible.builtin.command: umount /mnt/data1 # noqa: command-instead-of-module
+      changed_when: true
 
     - name: Verify mount guard rejects missing test disk
       ansible.builtin.command: /usr/local/libexec/snapraid-manager-mount-check task-begin
@@ -60,11 +59,8 @@
       failed_when: snapraid_manager_test_mount_guard.rc != 1
 
     - name: Restore disposable test disk
-      ansible.posix.mount:
-        path: /mnt/data1
-        src: tmpfs
-        fstype: tmpfs
-        state: ephemeral
+      ansible.builtin.command: mount -t tmpfs tmpfs /mnt/data1 # noqa: command-instead-of-module
+      changed_when: true
 
     - name: Simulate UI configuration drift
       ansible.builtin.lineinfile:
