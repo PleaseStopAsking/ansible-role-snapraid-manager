@@ -1,6 +1,5 @@
 ---
 galaxy_info:
-  namespace: pleasestopasking
   role_name: snapraid_manager
   author: PleaseStopAsking
   description: Manage SnapRAID and optional SnapRAID Daemon on Debian and Ubuntu amd64
