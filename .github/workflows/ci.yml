@@ -4,6 +4,12 @@ on:
   push:
     branches:
       - '**'
+      - '!main'
+    paths-ignore:
+      - README.md
+      - LICENSE
+      - .gitignore
+      - .editorconfig
   pull_request:
   workflow_dispatch:
 permissions:
