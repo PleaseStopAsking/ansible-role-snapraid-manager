@@ -6,12 +6,11 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+env:
+  ANSIBLE_CORE_VERSION: "2.21.0"
 jobs:
   lint-and-unit:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        ansible: ["2.19", "2.21"]
     steps:
       - uses: actions/checkout@v7
         with:
@@ -20,7 +19,7 @@ jobs:
         with:
           python-version: "3.13"
       - name: Install test dependencies
-        run: pip install 'ansible-core~=${{ matrix.ansible }}.0' ansible-lint
+        run: pip install 'ansible-core~=${{ env.ANSIBLE_CORE_VERSION }}' ansible-lint
       - name: Install test collections
         working-directory: ansible-role-snapraid-manager
         run: ansible-galaxy collection install -r tests/requirements.yml -p .ansible/collections
@@ -30,6 +29,7 @@ jobs:
       - name: Run host-safe behavior tests
         working-directory: ansible-role-snapraid-manager
         run: ansible-playbook -i localhost, tests/core.yml
+
   integration:
     runs-on: ubuntu-latest
     strategy:
@@ -44,7 +44,7 @@ jobs:
         with:
           python-version: "3.13"
       - name: Install Ansible
-        run: pip install 'ansible-core>=2.19,<2.22'
+        run: pip install 'ansible-core~=${{ env.ANSIBLE_CORE_VERSION }}'
       - name: Install Docker connection plugin
         working-directory: ansible-role-snapraid-manager
         run: ansible-galaxy collection install -r tests/requirements.yml -p .ansible/collections
@@ -75,3 +75,14 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes
+      
+      - name: Install Ansible
+        run: pip3 install 'ansible-core~=${{ env.ANSIBLE_CORE_VERSION }}'
+
+      - name: Trigger import on Galaxy
+        env:
+          GALAXY_API_KEY: ${{ secrets.GALAXY_API_KEY }}
+        run: |
+          : "${GALAXY_API_KEY:?GALAXY_API_KEY secret is required to publish a release}"
+          ansible-galaxy role import --api-key "$GALAXY_API_KEY" \
+            "${GITHUB_REPOSITORY%%/*}" "${GITHUB_REPOSITORY#*/}"
