@@ -7,8 +7,17 @@ case "$1:$2" in
     result:maintenance)
         case "$3" in
             error|critical)
+{% if snapraid_manager_healthchecks_include_report %}
+                exec /usr/bin/curl --disable --config /etc/snapraid-manager/healthchecks-fail.curl --header 'Content-Type: text/plain; charset=utf-8' --data-binary @-
+{% else %}
                 exec /usr/bin/curl --disable --config /etc/snapraid-manager/healthchecks-fail.curl
+{% endif %}
                 ;;
+{% if snapraid_manager_healthchecks_include_report %}
+            info|warning)
+                exec /usr/bin/curl --disable --config /etc/snapraid-manager/healthchecks-log.curl --header 'Content-Type: text/plain; charset=utf-8' --data-binary @-
+                ;;
+{% endif %}
         esac
         ;;
 esac

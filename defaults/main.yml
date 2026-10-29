@@ -25,6 +25,7 @@ snapraid_manager_daemon_package_checksum: "sha256:7f8ddbf41f6bb425371095f4b156f5
 snapraid_manager_daemon_options: {}
 snapraid_manager_daemon_hook: ""
 snapraid_manager_healthchecks_enabled: false
+snapraid_manager_healthchecks_include_report: false
 snapraid_manager_healthchecks_ping_url: ""
 snapraid_manager_healthchecks_timeout: 10
 snapraid_manager_healthchecks_retries: 3
